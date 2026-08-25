@@ -1,0 +1,10 @@
+# Local environment configuration file (Crucial)
+.env
+
+# Virtual environment folders
+venv/
+
+
+# Python caches
+__pycache__/
+*.pyc
