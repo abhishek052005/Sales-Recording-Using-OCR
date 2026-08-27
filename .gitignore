@@ -1,6 +1,6 @@
 # Local environment configuration file (Crucial)
 .env
-
+reg.txt
 # Virtual environment folders
 venv/
 
