@@ -42,15 +42,6 @@ app = FastAPI(title="Secured OCR Backend")
 # CORS MIDDLEWARE (NFR-3 Security)
 # ==========================================
 
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "file://",  # For local HTML files
-]
 
 app.add_middleware(
     CORSMiddleware,
@@ -158,120 +149,176 @@ async def auth_page(request: Request):
 # UPLOAD INVOICE 
 # ==========================================
 
+# @app.post("/upload")
+# async def upload_invoice(
+#     file: UploadFile = File(...),
+#     current_user: TokenData = Depends(get_current_user),
+# ):
+
+#     allowed_extensions = ["jpg", "jpeg", "png", "pdf"]
+
+#     if not file.filename:
+#         return JSONResponse(
+#             status_code=400,
+#             content={"error": "Filename is missing."}
+#         )
+
+#     extension = file.filename.split(".")[-1].lower()
+
+#     if extension not in allowed_extensions:
+#         return JSONResponse(
+#             status_code=400,
+#             content={
+#                 "error": "Only JPG, JPEG, PNG, and PDF files are allowed."
+#             }
+#         )
+
+#     #Check for duplicate filename for current user
+#     if check_filename_for_user(file.filename, current_user.user_id):
+#         return JSONResponse(
+#             status_code=409,
+#             content={
+#                 "error": f"You have already uploaded a file named '{file.filename}'. "
+#                          "Please use a different filename or delete the existing file first."
+#             }
+#         )
+
+#     # 2. Save uploaded file
+#     upload_path = os.path.join(UPLOAD_FOLDER, file.filename)
+
+#     with open(upload_path, "wb") as buffer:
+#         shutil.copyfileobj(file.file, buffer)
+
+
+#     # 3. Convert PDF to images (if PDF)
+#     input_image_paths = []
+#     if extension == "pdf":
+#         try:
+#             # Convert each PDF page into a distinct image file
+#             input_image_paths = convert_pdf_to_images(upload_path, UPLOAD_FOLDER)
+#         except Exception as e:
+#             return JSONResponse(
+#                 status_code=500,
+#                 content={"error": f"Failed to process PDF: {str(e)}"}
+#             )
+#     else:
+#         input_image_paths = [upload_path]
+
+    
+#     # 4. Preprocess and Run OCR across all pages
+
+#     all_page_ocr_texts = []
+
+#     for img_path in input_image_paths:
+#         img_filename = os.path.basename(img_path)
+#         processed_path = os.path.join(PROCESSED_FOLDER, img_filename)
+
+#         # Preprocess individual page image
+#         processed_images = preprocess_image(img_path, processed_path)
+
+#         # Extract text from individual page image
+#         page_text = extract_best_text(processed_images)
+#         if page_text and page_text.strip():
+#             all_page_ocr_texts.append(page_text.strip())
+
+#     # Merge OCR text from all pages with explicit page separators
+#     combined_ocr_text = "\n\n--- Page Separator ---\n\n".join(all_page_ocr_texts)
+
+#     if not combined_ocr_text.strip():
+#         return JSONResponse(
+#             status_code=422,
+#             content={"error": "OCR could not extract text from document."}
+#         )
+
+
+#     # 5. Save combined OCR text
+
+#     output_file = os.path.join(
+#         OCR_OUTPUT_FOLDER,
+#         f"{file.filename}.txt"
+#     )
+
+#     with open(output_file, "w", encoding="utf-8") as f:
+#         f.write(combined_ocr_text)
+
+
+#     # 6. Groq Extraction → Structured JSON
+#     invoice_data = extract_invoice_data(combined_ocr_text)
+
+#     duplicate_invoice = find_duplicate_invoice(
+#         invoice_number=invoice_data.get("invoice_number"),
+#         vendor_name=invoice_data.get("vendor", {}).get("name"),
+#         invoice_date=invoice_data.get("invoice_date"),
+#         total=invoice_data.get("total"),
+#     )
+
+#     # 7. Return extracted result for review
+#     return {
+#         "message": "Success",
+#         "filename": file.filename,
+#         "ocr_text": combined_ocr_text,
+#         "invoice_data": invoice_data,
+#         "duplicate_detected": bool(duplicate_invoice),
+#         "duplicate_invoice": duplicate_invoice,
+#     }
+
+# Locate @app.post("/upload") in your main.py and update step 4 & 6:
 @app.post("/upload")
 async def upload_invoice(
     file: UploadFile = File(...),
     current_user: TokenData = Depends(get_current_user),
 ):
+    # ... [Keep steps 1 - 3 as they are] ...
 
-    allowed_extensions = ["jpg", "jpeg", "png", "pdf"]
+    try:
+        # Step 4: Preprocess and Run OCR across all pages
+        all_page_ocr_texts = []
+        for img_path in input_image_paths:
+            img_filename = os.path.basename(img_path)
+            processed_path = os.path.join(PROCESSED_FOLDER, img_filename)
 
-    if not file.filename:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Filename is missing."}
-        )
+            processed_images = preprocess_image(img_path, processed_path)
+            page_text = extract_best_text(processed_images)
+            if page_text and page_text.strip():
+                all_page_ocr_texts.append(page_text.strip())
 
-    extension = file.filename.split(".")[-1].lower()
+        combined_ocr_text = "\n\n--- Page Separator ---\n\n".join(all_page_ocr_texts)
 
-    if extension not in allowed_extensions:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "Only JPG, JPEG, PNG, and PDF files are allowed."
-            }
-        )
-
-    #Check for duplicate filename for current user
-    if check_filename_for_user(file.filename, current_user.user_id):
-        return JSONResponse(
-            status_code=409,
-            content={
-                "error": f"You have already uploaded a file named '{file.filename}'. "
-                         "Please use a different filename or delete the existing file first."
-            }
-        )
-
-    # 2. Save uploaded file
-    upload_path = os.path.join(UPLOAD_FOLDER, file.filename)
-
-    with open(upload_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-
-    # 3. Convert PDF to images (if PDF)
-    input_image_paths = []
-    if extension == "pdf":
-        try:
-            # Convert each PDF page into a distinct image file
-            input_image_paths = convert_pdf_to_images(upload_path, UPLOAD_FOLDER)
-        except Exception as e:
+        if not combined_ocr_text.strip():
             return JSONResponse(
-                status_code=500,
-                content={"error": f"Failed to process PDF: {str(e)}"}
+                status_code=422,
+                content={"error": "OCR could not extract text from document."}
             )
-    else:
-        input_image_paths = [upload_path]
 
-    
-    # 4. Preprocess and Run OCR across all pages
+        output_file = os.path.join(OCR_OUTPUT_FOLDER, f"{file.filename}.txt")
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(combined_ocr_text)
 
-    all_page_ocr_texts = []
+        # Step 6: Groq Extraction -> Structured JSON
+        invoice_data = extract_invoice_data(combined_ocr_text)
 
-    for img_path in input_image_paths:
-        img_filename = os.path.basename(img_path)
-        processed_path = os.path.join(PROCESSED_FOLDER, img_filename)
-
-        # Preprocess individual page image
-        processed_images = preprocess_image(img_path, processed_path)
-
-        # Extract text from individual page image
-        page_text = extract_best_text(processed_images)
-        if page_text and page_text.strip():
-            all_page_ocr_texts.append(page_text.strip())
-
-    # Merge OCR text from all pages with explicit page separators
-    combined_ocr_text = "\n\n--- Page Separator ---\n\n".join(all_page_ocr_texts)
-
-    if not combined_ocr_text.strip():
-        return JSONResponse(
-            status_code=422,
-            content={"error": "OCR could not extract text from document."}
+        duplicate_invoice = find_duplicate_invoice(
+            invoice_number=invoice_data.get("invoice_number"),
+            vendor_name=invoice_data.get("vendor", {}).get("name"),
+            invoice_date=invoice_data.get("invoice_date"),
+            total=invoice_data.get("total"),
         )
 
+        return {
+            "message": "Success",
+            "filename": file.filename,
+            "ocr_text": combined_ocr_text,
+            "invoice_data": invoice_data,
+            "duplicate_detected": bool(duplicate_invoice),
+            "duplicate_invoice": duplicate_invoice,
+        }
 
-    # 5. Save combined OCR text
-
-    output_file = os.path.join(
-        OCR_OUTPUT_FOLDER,
-        f"{file.filename}.txt"
-    )
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(combined_ocr_text)
-
-
-    # 6. Groq Extraction → Structured JSON
-    invoice_data = extract_invoice_data(combined_ocr_text)
-
-    duplicate_invoice = find_duplicate_invoice(
-        invoice_number=invoice_data.get("invoice_number"),
-        vendor_name=invoice_data.get("vendor", {}).get("name"),
-        invoice_date=invoice_data.get("invoice_date"),
-        total=invoice_data.get("total"),
-    )
-
-    # 7. Return extracted result for review
-    return {
-        "message": "Success",
-        "filename": file.filename,
-        "ocr_text": combined_ocr_text,
-        "invoice_data": invoice_data,
-        "duplicate_detected": bool(duplicate_invoice),
-        "duplicate_invoice": duplicate_invoice,
-    }
-
-
+    except Exception as e:
+        # ALWAYS return JSON on failure to avoid empty/HTML response crashes
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Internal server error: {str(e)}"}
+        )
 # ==========================================
 # SAVE REVIEWED INVOICE 
 # ==========================================
