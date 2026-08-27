@@ -11,8 +11,7 @@ passlib[bcrypt]==1.7.4
 PyJWT==2.8.0
 pydantic==2.13.4
 pydantic-settings==2.14.2
-paddleocr>=2.7.0
+paddleocr==2.7.3
 paddlepaddle==2.6.2
-easyocr==1.7.2
 pdf2image==1.17.0
 pillow==12.3.0
