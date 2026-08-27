@@ -268,10 +268,44 @@ async def upload_invoice(
     file: UploadFile = File(...),
     current_user: TokenData = Depends(get_current_user),
 ):
-    # ... [Keep steps 1 - 3 as they are] ...
+    allowed_extensions = ["jpg", "jpeg", "png", "pdf"]
 
+    if not file.filename:
+        return JSONResponse(status_code=400, content={"error": "Filename is missing."})
+
+    extension = file.filename.split(".")[-1].lower()
+    if extension not in allowed_extensions:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Only JPG, JPEG, PNG, and PDF files are allowed."}
+        )
+
+    if check_filename_for_user(file.filename, current_user.user_id):
+        return JSONResponse(
+            status_code=409,
+            content={"error": f"You have already uploaded a file named '{file.filename}'."}
+        )
+
+    # 1. Save uploaded file
+    upload_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    with open(upload_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # 2. Define input_image_paths BEFORE processing
+    input_image_paths = []
+    if extension == "pdf":
+        try:
+            input_image_paths = convert_pdf_to_images(upload_path, UPLOAD_FOLDER)
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Failed to process PDF: {str(e)}"}
+            )
+    else:
+        input_image_paths = [upload_path]
+
+    # 3. Process image pages
     try:
-        # Step 4: Preprocess and Run OCR across all pages
         all_page_ocr_texts = []
         for img_path in input_image_paths:
             img_filename = os.path.basename(img_path)
@@ -294,7 +328,6 @@ async def upload_invoice(
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(combined_ocr_text)
 
-        # Step 6: Groq Extraction -> Structured JSON
         invoice_data = extract_invoice_data(combined_ocr_text)
 
         duplicate_invoice = find_duplicate_invoice(
@@ -312,9 +345,7 @@ async def upload_invoice(
             "duplicate_detected": bool(duplicate_invoice),
             "duplicate_invoice": duplicate_invoice,
         }
-
     except Exception as e:
-        # ALWAYS return JSON on failure to avoid empty/HTML response crashes
         return JSONResponse(
             status_code=500,
             content={"error": f"Internal server error: {str(e)}"}
