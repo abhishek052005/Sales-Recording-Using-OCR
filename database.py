@@ -18,13 +18,37 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is missing in .env")
 
+# Normalize PostgreSQL driver prefix for SQLAlchemy (e.g. postgres:// or postgresql:// -> postgresql+psycopg2://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+
 
 # ==========================================
-# MYSQL CONNECTION & BASE
+# SUPABASE POSTGRESQL CONNECTION & BASE
 # ==========================================
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# Configure SQLAlchemy engine with connection pool pre-ping for remote databases
+engine_kwargs = {"pool_pre_ping": True}
+if "sqlite" not in DATABASE_URL:
+    engine_kwargs.update({"pool_size": 10, "max_overflow": 20})
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+# Optional Supabase Client initialization using API keys
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
+
+supabase_client = None
+if SUPABASE_URL and SUPABASE_SECRET_KEY:
+    try:
+        from supabase import create_client
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
+    except Exception as e:
+        print(f"Warning: Supabase SDK client initialization skipped: {e}")
+
 
 
 class Base(DeclarativeBase):
@@ -121,7 +145,18 @@ class InvoiceItemDB(Base):
 # ==========================================
 
 def create_tables():
-    Base.metadata.create_all(bind=engine)
+    if "YOUR_SUPABASE_DB_PASSWORD" in DATABASE_URL:
+        print("[!] NOTICE: Supabase database password is not configured in .env yet.")
+        print("[!] Please update DATABASE_URL in .env with your actual password and run 'migrate_to_supabase.py'.")
+        return
+
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("[OK] Supabase database tables verified/created successfully.")
+    except Exception as e:
+        print(f"[!] Warning: Could not auto-create database tables on startup: {e}")
+        print("[!] Ensure your database password in .env is correct and Supabase project is active.")
+
 
 
 # ==========================================

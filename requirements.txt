@@ -5,7 +5,8 @@ python-multipart==0.0.32
 python-dotenv==1.2.2
 groq==1.6.0
 SQLAlchemy==2.0.51
-PyMySQL==1.2.0
+psycopg2-binary==2.9.10
+supabase==2.11.0
 bcrypt==4.0.1
 passlib[bcrypt]==1.7.4
 PyJWT==2.8.0

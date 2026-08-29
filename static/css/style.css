@@ -101,6 +101,24 @@ h1 {
   background: var(--panel-alt);
 }
 
+.logout-btn {
+  border: 1px solid var(--line);
+  padding: 8px 16px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--line);
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.logout-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
 .dashboard {
   display: grid;
   grid-template-columns: 1.15fr 1.85fr;

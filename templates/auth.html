@@ -317,10 +317,15 @@
             body: formData,
           });
 
-          const data = await response.json();
+          let data = {};
+          try {
+            data = await response.json();
+          } catch (e) {
+            throw new Error(`Server response error (${response.status}: ${response.statusText})`);
+          }
 
           if (!response.ok) {
-            throw new Error(data.detail || 'Login failed.');
+            throw new Error(data.detail || data.error || 'Login failed.');
           }
 
           // Save Access Token in localStorage
@@ -362,10 +367,15 @@
             body: JSON.stringify(payload),
           });
 
-          const data = await response.json();
+          let data = {};
+          try {
+            data = await response.json();
+          } catch (e) {
+            throw new Error(`Server response error (${response.status}: ${response.statusText})`);
+          }
 
           if (!response.ok) {
-            throw new Error(data.detail || 'Registration failed.');
+            throw new Error(data.detail || data.error || 'Registration failed.');
           }
 
           setMessage('success', 'Account created successfully! Switching to login...');

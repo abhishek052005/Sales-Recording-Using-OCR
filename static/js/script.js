@@ -14,12 +14,20 @@ const fileName = document.getElementById('fileName');
 const messageBox = document.getElementById('messageBox');
 const submitBtn = document.getElementById('submitBtn');
 const systemStatus = document.getElementById('systemStatus');
+const logoutBtn = document.getElementById('logoutBtn');
 const reviewPanel = document.getElementById('reviewPanel');
 const reviewForm = document.getElementById('reviewForm');
 const reviewItemsList = document.getElementById('reviewItemsList');
 const editReviewBtn = document.getElementById('editReviewBtn');
 const invoiceTableBody = document.getElementById('invoiceTableBody');
 const sortToggleBtn = document.getElementById('sortToggleBtn');
+
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('access_token');
+    window.location.href = 'auth.html';
+  });
+}
 
 let activeInvoiceData = null;
 let activeFileName = '';
@@ -38,6 +46,12 @@ const getAuthHeaders = (additionalHeaders = {}) => ({
 /**
  * UI Helper Functions
  */
+const setSystemStatus = (text) => {
+  if (systemStatus) {
+    systemStatus.textContent = text;
+  }
+};
+
 const setMessage = (type, text) => {
   messageBox.classList.remove('hidden', 'success', 'error');
   messageBox.classList.add(type);
@@ -123,7 +137,12 @@ const loadInvoiceEntries = async () => {
       return;
     }
 
-    const result = await response.json();
+    let result = {};
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error(`Server error (${response.status}: ${response.statusText})`);
+    }
 
     if (!response.ok) {
       throw new Error(result.error || result.detail || 'Could not load invoices.');
@@ -308,7 +327,7 @@ reviewForm.addEventListener('submit', async (event) => {
   submitBtn.disabled = true;
   editReviewBtn.disabled = true;
   setMessage('success', 'Saving reviewed invoice...');
-  systemStatus.textContent = 'Saving invoice';
+  setSystemStatus('Saving invoice');
 
   try {
     const response = await fetch(`${API_BASE_URL}/save-review`, {
@@ -323,18 +342,23 @@ reviewForm.addEventListener('submit', async (event) => {
       return;
     }
 
-    const result = await response.json();
+    let result = {};
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error(`Server error (${response.status}: ${response.statusText})`);
+    }
 
     if (!response.ok) {
       throw new Error(result.error || result.detail || 'Failed to save invoice.');
     }
 
     setMessage('success', `Invoice saved successfully: ${result.filename}`);
-    systemStatus.textContent = 'Saved';
+    setSystemStatus('Saved');
     await loadInvoiceEntries();
   } catch (error) {
     setMessage('error', error.message || 'Unable to save the reviewed invoice.');
-    systemStatus.textContent = 'Error';
+    setSystemStatus('Error');
   } finally {
     submitBtn.disabled = false;
     editReviewBtn.disabled = false;
@@ -357,7 +381,7 @@ uploadForm.addEventListener('submit', async (event) => {
 
   submitBtn.disabled = true;
   submitBtn.textContent = 'Processing...';
-  systemStatus.textContent = 'Processing invoice';
+  setSystemStatus('Processing invoice');
   setMessage('success', 'Uploading invoice and extracting data...');
 
   try {
@@ -373,7 +397,12 @@ uploadForm.addEventListener('submit', async (event) => {
       return;
     }
 
-    const result = await response.json();
+    let result = {};
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error(`Server error (${response.status}: ${response.statusText})`);
+    }
 
     if (!response.ok) {
       throw new Error(result.error || result.detail || 'Upload failed.');
@@ -392,14 +421,14 @@ uploadForm.addEventListener('submit', async (event) => {
         'error',
         `Duplicate invoice detected. Existing invoice ID ${result.duplicate_invoice.id} already exists. Review before saving.`
       );
-      systemStatus.textContent = 'Duplicate';
+      setSystemStatus('Duplicate');
     } else {
       setMessage('success', 'Invoice extracted successfully. Review and confirm the details before saving.');
-      systemStatus.textContent = 'Review';
+      setSystemStatus('Review');
     }
   } catch (error) {
     setMessage('error', error.message || 'An unexpected error occurred.');
-    systemStatus.textContent = 'Error';
+    setSystemStatus('Error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Process invoice';
