@@ -5,13 +5,12 @@ from paddleocr import PaddleOCR
 
 # Global OCR instance to avoid reloading weights on every API request
 ocr = PaddleOCR(
-    lang="en", use_angle_cls=True, use_space_char=True, drop_score=0.55
+    lang="en", use_angle_cls=True, use_space_char=True
 )
 
 
-def parse_receipt_boxes(ocr_results, y_tolerance=12):
+def parse_receipt_boxes(ocr_results, y_tolerance=12, min_score=0.55):
     """Sorts OCR bounding boxes top-to-bottom using y_center
-
     and left-to-right using x_min.
     """
     if not ocr_results or not ocr_results[0]:
@@ -21,6 +20,8 @@ def parse_receipt_boxes(ocr_results, y_tolerance=12):
     parsed_items = []
 
     for box, (text, score) in boxes:
+        if score < min_score:
+            continue
         x_min = min(pt[0] for pt in box)
         y_min = min(pt[1] for pt in box)
         y_max = max(pt[1] for pt in box)
