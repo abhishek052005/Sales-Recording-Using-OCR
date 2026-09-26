@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
+from preprocessing.preprocess import preprocess_image
 from ocr.ocr_engine import extract_best_text
 from extraction.extractor import extract_invoice_data
 from local_store import check_filename, find_duplicate_invoice, get_all_invoices, save_invoice
@@ -44,9 +45,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ==========================================
 
 UPLOAD_FOLDER = "uploads"
+PROCESSED_FOLDER = "processed"
 OCR_OUTPUT_FOLDER = "ocr_output"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 os.makedirs(OCR_OUTPUT_FOLDER, exist_ok=True)
 
 # ==========================================
@@ -96,7 +99,10 @@ def process_invoice(file: UploadFile):
 
     all_page_ocr_texts = []
     for img_path in input_image_paths:
-        page_text = extract_best_text(img_path)
+        img_filename = os.path.basename(img_path)
+        processed_path = os.path.join(PROCESSED_FOLDER, img_filename)
+        processed_images = preprocess_image(img_path, processed_path)
+        page_text = extract_best_text(processed_images)
         if page_text and page_text.strip():
             all_page_ocr_texts.append(page_text.strip())
 
@@ -125,9 +131,17 @@ def process_invoice(file: UploadFile):
         "duplicate_invoice": duplicate_invoice,
     }
 
-
 @app.post("/upload")
-async def upload_invoice(files: list[UploadFile] = File(...)):
+async def upload_file(file: UploadFile = File(...)):
+    contents = await file.read()
+
+    return {
+        "filename": file.filename,
+        "size": len(contents),
+        "message": "Upload works"
+    }
+# @app.post("/upload")
+# async def upload_invoice(files: list[UploadFile] = File(...)):
     async def stream_results():
         for file in files:
             try:
