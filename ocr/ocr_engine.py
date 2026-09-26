@@ -5,7 +5,8 @@ from paddleocr import PaddleOCR
 
 # Global OCR instance to avoid reloading weights on every API request
 ocr = PaddleOCR(
-    lang="en", use_angle_cls=True, use_space_char=True
+    lang="en",
+    use_angle_cls=True
 )
 
 
