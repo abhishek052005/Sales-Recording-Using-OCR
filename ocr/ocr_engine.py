@@ -3,11 +3,16 @@ import cv2
 import numpy as np
 from paddleocr import PaddleOCR
 
-# Global OCR instance to avoid reloading weights on every API request
-ocr = PaddleOCR(
-    lang="en",
-    use_angle_cls=True
-)
+# Initialize lazily so the app does not spend a long time loading OCR models
+# during cold starts on hosted platforms such as Render.
+ocr = None
+
+
+def get_ocr():
+    global ocr
+    if ocr is None:
+        ocr = PaddleOCR(lang="en", use_angle_cls=True)
+    return ocr
 
 
 def parse_receipt_boxes(ocr_results, y_tolerance=12, min_score=0.55):
@@ -64,13 +69,15 @@ def extract_best_text(images: dict) -> str:
         images.get("original"),
     ]
 
+    ocr_engine = get_ocr()
+
     for path in preferred_images:
         if not path:
             continue
         if not os.path.exists(path):
             continue
 
-        raw_result = ocr.ocr(path, cls=True)
+        raw_result = ocr_engine.ocr(path, cls=True)
 
         if not raw_result or not raw_result[0]:
             continue
