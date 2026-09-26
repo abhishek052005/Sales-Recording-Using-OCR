@@ -139,8 +139,3 @@ def preprocess_image(input_path, output_path):
         "threshold": threshold_path,
         "original": input_path
     }
-input_folder = "bill_image"
-output_folder = "image_cleaning_one_folder"
-
-if __name__ == "__main__":
-    preprocess_image(input_folder,output_folder)

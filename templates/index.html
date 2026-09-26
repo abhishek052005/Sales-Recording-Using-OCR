@@ -19,7 +19,6 @@
             <h1>OCR Extraction Portal</h1>
           </div>
         </div>
-        <button type="button" id="logoutBtn" class="logout-btn">Logout</button>
       </header>
 
       <main class="dashboard">
@@ -33,18 +32,18 @@
 
           <form id="uploadForm" class="upload-form">
             <label class="file-dropzone" for="invoiceFile">
-              <input id="invoiceFile" type="file" accept=".jpg,.jpeg,.png,.pdf" />
+              <input id="invoiceFile" type="file" accept=".jpg,.jpeg,.png,.pdf" multiple />
               <div class="dropzone-content">
                 <span class="upload-icon">⇪</span>
-                <strong>Choose invoice file</strong>
+                <strong>Choose invoice files</strong>
                 <small>Accepted: JPG, PNG, PDF</small>
               </div>
             </label>
 
-            <div class="file-meta" id="fileName">No file selected</div>
+            <div class="file-meta" id="fileName">No files selected</div>
 
             <button type="submit" id="submitBtn" class="primary-btn">
-              Process invoice
+              Process invoices
             </button>
           </form>
 
@@ -168,7 +167,16 @@
             <p class="section-label">Entries</p>
             <h2>All invoices</h2>
           </div>
-          <button id="sortToggleBtn" class="sort-btn" type="button">Sort: Newest first</button>
+          <div class="table-actions">
+            <button id="sortToggleBtn" class="sort-btn" type="button">Sort: Newest first</button>
+            <label class="download-control">
+              <select id="downloadFormat" class="download-btn" aria-label="Download invoices">
+                <option value="">Download</option>
+                <option value="xls">Download XLS</option>
+                <option value="pdf">Download PDF</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div class="table-wrapper">
@@ -194,6 +202,6 @@
       </section>
     </div>
 
-    <script src="{{ url_for('static', path='/js/script.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/script.js') }}?v=3"></script>
   </body>
 </html>

@@ -56,14 +56,16 @@ def parse_receipt_boxes(ocr_results, y_tolerance=12, min_score=0.55):
 
 
 def extract_best_text(images: dict) -> str:
-    """Runs OCR on preprocessed image variants and returns
+    """Run OCR once on the preferred variant, with fallbacks when needed."""
+    preferred_images = [
+        images.get("threshold"),
+        images.get("gray"),
+        images.get("original"),
+    ]
 
-    the result with the highest average confidence score.
-    """
-    best_text = ""
-    best_score = -1.0
-
-    for name, path in images.items():
+    for path in preferred_images:
+        if not path:
+            continue
         if not os.path.exists(path):
             continue
 
@@ -72,13 +74,8 @@ def extract_best_text(images: dict) -> str:
         if not raw_result or not raw_result[0]:
             continue
 
-        scores = [item[1][1] for item in raw_result[0]]
-        avg_score = sum(scores) / len(scores) if scores else 0.0
-
         text = parse_receipt_boxes(raw_result)
+        if text.strip():
+            return text
 
-        if avg_score > best_score:
-            best_score = avg_score
-            best_text = text
-
-    return best_text
+    return ""

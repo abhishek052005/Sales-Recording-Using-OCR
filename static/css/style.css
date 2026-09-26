@@ -144,6 +144,55 @@ h1 {
   margin-bottom: 18px;
 }
 
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.download-btn,
+.sort-btn {
+  height: 34px;
+  width: 160px;
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  background: var(--panel-alt);
+  color: var(--line);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.download-btn {
+  appearance: none;
+  text-align: center;
+}
+
+.download-btn:hover,
+.sort-btn:hover,
+.download-btn:focus-visible,
+.sort-btn:focus-visible {
+  background: var(--line);
+  color: white;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .panel-header h2 {
   margin-top: 8px;
   font-size: clamp(1.2rem, 1.8vw, 1.8rem);

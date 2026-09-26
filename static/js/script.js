@@ -1,12 +1,6 @@
 // Base API configuration
 const API_BASE_URL = '';
 
-// Authentication Guard: Check for JWT token
-const token = localStorage.getItem('access_token');
-if (!token) {
-  window.location.href = 'auth.html';
-}
-
 // DOM Elements
 const uploadForm = document.getElementById('uploadForm');
 const invoiceFile = document.getElementById('invoiceFile');
@@ -14,34 +8,22 @@ const fileName = document.getElementById('fileName');
 const messageBox = document.getElementById('messageBox');
 const submitBtn = document.getElementById('submitBtn');
 const systemStatus = document.getElementById('systemStatus');
-const logoutBtn = document.getElementById('logoutBtn');
 const reviewPanel = document.getElementById('reviewPanel');
 const reviewForm = document.getElementById('reviewForm');
 const reviewItemsList = document.getElementById('reviewItemsList');
 const editReviewBtn = document.getElementById('editReviewBtn');
+const confirmReviewBtn = document.getElementById('confirmReviewBtn');
 const invoiceTableBody = document.getElementById('invoiceTableBody');
 const sortToggleBtn = document.getElementById('sortToggleBtn');
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('access_token');
-    window.location.href = 'auth.html';
-  });
-}
+const downloadFormat = document.getElementById('downloadFormat');
 
 let activeInvoiceData = null;
 let activeFileName = '';
 let activeOcrText = '';
+let pendingInvoices = [];
+let processingBatch = false;
 let savedInvoices = [];
 let invoiceSortAsc = false;
-
-/**
- * Helper to construct Authorization headers
- */
-const getAuthHeaders = (additionalHeaders = {}) => ({
-  'Authorization': `Bearer ${token}`,
-  ...additionalHeaders,
-});
 
 /**
  * UI Helper Functions
@@ -85,6 +67,45 @@ const asNumber = (value) => {
   return Number.isFinite(num) ? num : null;
 };
 
+const showNextInvoice = () => {
+  const nextInvoice = pendingInvoices.shift();
+  if (!nextInvoice) {
+    activeInvoiceData = null;
+    activeFileName = '';
+    activeOcrText = '';
+    reviewPanel.classList.add('hidden');
+    return;
+  }
+
+  activeInvoiceData = nextInvoice.invoice_data || {};
+  activeFileName = nextInvoice.filename || '';
+  activeOcrText = nextInvoice.ocr_text || '';
+  renderInvoice(activeInvoiceData);
+  populateReviewForm(activeInvoiceData);
+  reviewPanel.classList.remove('hidden');
+
+  if (nextInvoice.duplicate_detected && nextInvoice.duplicate_invoice) {
+    setMessage(
+      'error',
+      `Duplicate invoice detected for ${activeFileName}. Review before saving.`
+    );
+    setSystemStatus('Duplicate');
+  } else {
+    setMessage('success', `Ready to review ${activeFileName}.`);
+    setSystemStatus('Review');
+  }
+  reviewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const handleInvoiceResult = (result) => {
+  pendingInvoices.push(result);
+  if (!activeInvoiceData) {
+    showNextInvoice();
+  } else {
+    setMessage('success', `${pendingInvoices.length} more invoice(s) waiting for review.`);
+  }
+};
+
 /**
  * Render Invoice Table
  */
@@ -121,6 +142,85 @@ const renderInvoiceEntries = (entries = savedInvoices) => {
     .join('');
 };
 
+const getSortedInvoiceEntries = () => [...savedInvoices].sort((a, b) => {
+  const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+  const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+  return invoiceSortAsc ? aDate - bDate : bDate - aDate;
+});
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const downloadXls = () => {
+  const rows = getSortedInvoiceEntries();
+  if (!rows.length) {
+    setMessage('error', 'There are no saved invoices to download.');
+    return;
+  }
+
+  const headers = ['ID', 'Invoice No.', 'Date', 'Vendor', 'GSTIN', 'Total', 'Saved'];
+  const body = rows.map((entry) => [
+    entry.id,
+    entry.invoice_number,
+    entry.invoice_date,
+    entry.vendor_name,
+    entry.vendor_gstin,
+    entry.total,
+    entry.created_at ? new Date(entry.created_at).toLocaleString() : '',
+  ]);
+  const table = [headers, ...body]
+    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+    .join('');
+  const blob = new Blob([
+    `<html><head><meta charset="UTF-8"></head><body><table>${table}</table></body></html>`,
+  ], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'invoices.xls';
+  link.click();
+  URL.revokeObjectURL(url);
+  setMessage('success', 'Invoice list downloaded as XLS.');
+};
+
+const downloadPdf = () => {
+  const rows = getSortedInvoiceEntries();
+  if (!rows.length) {
+    setMessage('error', 'There are no saved invoices to download.');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    setMessage('error', 'Allow pop-ups to download the PDF.');
+    return;
+  }
+  const tableRows = rows.map((entry) => `
+    <tr>
+      <td>${escapeHtml(entry.id)}</td>
+      <td>${escapeHtml(entry.invoice_number)}</td>
+      <td>${escapeHtml(entry.invoice_date)}</td>
+      <td>${escapeHtml(entry.vendor_name)}</td>
+      <td>${escapeHtml(entry.vendor_gstin)}</td>
+      <td>${escapeHtml(entry.total)}</td>
+      <td>${escapeHtml(entry.created_at ? new Date(entry.created_at).toLocaleString() : '')}</td>
+    </tr>`).join('');
+  printWindow.document.write(`<!doctype html><html><head><title>Invoices</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{font-size:20px}
+    table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #aaa;padding:7px;text-align:left}
+    th{background:#eee}</style></head><body><h1>Invoice Entries</h1>
+    <table><thead><tr><th>ID</th><th>Invoice No.</th><th>Date</th><th>Vendor</th><th>GSTIN</th><th>Total</th><th>Saved</th></tr></thead>
+    <tbody>${tableRows}</tbody></table></body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+  setMessage('success', 'PDF print dialog opened. Choose "Save as PDF".');
+};
+
 /**
  * API Call: Fetch Invoice Entries
  */
@@ -128,14 +228,7 @@ const loadInvoiceEntries = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/invoices`, {
       method: 'GET',
-      headers: getAuthHeaders(),
     });
-
-    if (response.status === 401) {
-      localStorage.removeItem('access_token');
-      window.location.href = 'auth.html';
-      return;
-    }
 
     let result = {};
     try {
@@ -302,8 +395,10 @@ const collectReviewData = () => {
  * Event Listeners
  */
 invoiceFile.addEventListener('change', () => {
-  const selected = invoiceFile.files && invoiceFile.files[0];
-  fileName.textContent = selected ? selected.name : 'No file selected';
+  const selectedFiles = invoiceFile.files ? [...invoiceFile.files] : [];
+  fileName.textContent = selectedFiles.length
+    ? `${selectedFiles.length} file(s) selected: ${selectedFiles.map((file) => file.name).join(', ')}`
+    : 'No files selected';
 });
 
 editReviewBtn.addEventListener('click', () => {
@@ -324,7 +419,7 @@ reviewForm.addEventListener('submit', async (event) => {
     invoice_data: collectReviewData(),
   };
 
-  submitBtn.disabled = true;
+  confirmReviewBtn.disabled = true;
   editReviewBtn.disabled = true;
   setMessage('success', 'Saving reviewed invoice...');
   setSystemStatus('Saving invoice');
@@ -332,15 +427,9 @@ reviewForm.addEventListener('submit', async (event) => {
   try {
     const response = await fetch(`${API_BASE_URL}/save-review`, {
       method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
-    if (response.status === 401) {
-      localStorage.removeItem('access_token');
-      window.location.href = 'auth.html';
-      return;
-    }
 
     let result = {};
     try {
@@ -356,11 +445,12 @@ reviewForm.addEventListener('submit', async (event) => {
     setMessage('success', `Invoice saved successfully: ${result.filename}`);
     setSystemStatus('Saved');
     await loadInvoiceEntries();
+    showNextInvoice();
   } catch (error) {
     setMessage('error', error.message || 'Unable to save the reviewed invoice.');
     setSystemStatus('Error');
   } finally {
-    submitBtn.disabled = false;
+    confirmReviewBtn.disabled = false;
     editReviewBtn.disabled = false;
   }
 });
@@ -369,69 +459,69 @@ reviewForm.addEventListener('submit', async (event) => {
 uploadForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  const selectedFile = invoiceFile.files && invoiceFile.files[0];
+  const selectedFiles = invoiceFile.files ? [...invoiceFile.files] : [];
 
-  if (!selectedFile) {
-    setMessage('error', 'Please choose an invoice file before uploading.');
+  if (selectedFiles.length === 0) {
+    setMessage('error', 'Please choose at least one invoice file before uploading.');
     return;
   }
 
   const formData = new FormData();
-  formData.append('file', selectedFile);
+  selectedFiles.forEach((file) => formData.append('files', file));
 
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Processing...';
-  setSystemStatus('Processing invoice');
-  setMessage('success', 'Uploading invoice and extracting data...');
+  submitBtn.textContent = 'Processing invoices...';
+  processingBatch = true;
+  setSystemStatus(`Processing ${selectedFiles.length} invoice(s)`);
+  setMessage('success', 'Uploading invoices. Each completed extraction will appear for review.');
 
   try {
     const response = await fetch(`${API_BASE_URL}/upload`, {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: formData,
     });
 
-    if (response.status === 401) {
-      localStorage.removeItem('access_token');
-      window.location.href = 'auth.html';
-      return;
-    }
-
-    let result = {};
-    try {
-      result = await response.json();
-    } catch (e) {
-      throw new Error(`Server error (${response.status}: ${response.statusText})`);
-    }
-
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
+      let result = {};
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error(`Server error (${response.status}: ${response.statusText})`);
+      }
       throw new Error(result.error || result.detail || 'Upload failed.');
     }
 
-    activeInvoiceData = result.invoice_data || {};
-    activeFileName = result.filename || selectedFile.name;
-    activeOcrText = result.ocr_text || '';
-
-    renderInvoice(activeInvoiceData);
-    populateReviewForm(activeInvoiceData);
-    reviewPanel.classList.remove('hidden');
-
-    if (result.duplicate_detected && result.duplicate_invoice) {
-      setMessage(
-        'error',
-        `Duplicate invoice detected. Existing invoice ID ${result.duplicate_invoice.id} already exists. Review before saving.`
-      );
-      setSystemStatus('Duplicate');
-    } else {
-      setMessage('success', 'Invoice extracted successfully. Review and confirm the details before saving.');
-      setSystemStatus('Review');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      lines.filter((line) => line.trim()).forEach((line) => {
+        const event = JSON.parse(line);
+        if (event.type === 'invoice') {
+          handleInvoiceResult(event.result);
+        } else if (event.type === 'error') {
+          setMessage('error', `${event.filename}: ${event.error}`);
+          setSystemStatus('Error');
+        }
+      });
+      if (done) break;
+    }
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer);
+      if (event.type === 'invoice') handleInvoiceResult(event.result);
     }
   } catch (error) {
     setMessage('error', error.message || 'An unexpected error occurred.');
     setSystemStatus('Error');
   } finally {
+    processingBatch = false;
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Process invoice';
+    submitBtn.textContent = 'Process invoices';
+    if (pendingInvoices.length > 0 && !activeInvoiceData) showNextInvoice();
   }
 });
 
@@ -448,6 +538,14 @@ if (sortToggleBtn) {
     invoiceSortAsc = !invoiceSortAsc;
     updateSortButtonText();
     renderInvoiceEntries();
+  });
+}
+
+if (downloadFormat) {
+  downloadFormat.addEventListener('change', () => {
+    if (downloadFormat.value === 'xls') downloadXls();
+    if (downloadFormat.value === 'pdf') downloadPdf();
+    downloadFormat.value = '';
   });
 }
 

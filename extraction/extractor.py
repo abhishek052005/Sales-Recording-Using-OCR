@@ -1,17 +1,15 @@
 import json
 import os
 
-from groq import Groq
 from dotenv import load_dotenv
+from google import genai
 
 from .models import Invoice
 
 
 load_dotenv()
 
-client = Groq(
-    api_key=os.getenv("GROQ_API_KEY")
-)
+client = None
 
 
 SYSTEM_PROMPT = """
@@ -181,65 +179,75 @@ def get_invoice_schema():
     }
 
 
+def get_gemini_schema(schema):
+    if isinstance(schema, list):
+        return [get_gemini_schema(item) for item in schema]
+
+    if not isinstance(schema, dict):
+        return schema
+
+    converted = {
+        key: get_gemini_schema(value)
+        for key, value in schema.items()
+        if key not in {"type", "additionalProperties"}
+    }
+    schema_type = schema.get("type")
+
+    if isinstance(schema_type, list):
+        non_null_type = next(
+            item for item in schema_type if item != "null"
+        )
+        converted["type"] = non_null_type.upper()
+        converted["nullable"] = True
+    elif isinstance(schema_type, str):
+        converted["type"] = schema_type.upper()
+
+    return converted
+
+
 def extract_invoice_data(ocr_text: str):
 
     if not ocr_text or not ocr_text.strip():
         raise ValueError("OCR text is empty")
 
-    completion = client.chat.completions.create(
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY is not configured")
 
-        # Your model
-        model="openai/gpt-oss-120b",
+    global client
+    if client is None:
+        client = genai.Client(api_key=api_key)
 
-        messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            },
-            {
-                "role": "user",
-                "content": f"""
+    response = client.models.generate_content(
+        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+        contents=f"""
 Extract invoice data from this OCR text:
 
 -------------------------
 {ocr_text}
 -------------------------
 """
-            }
-        ],
-
-        # IMPORTANT:
-        # Do NOT use stream=True for DB extraction
-        stream=False,
-
-        # Structured JSON
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "invoice_extraction",
-                "strict": True,
-                "schema": get_invoice_schema()
-            }
+        ,
+        config={
+            "system_instruction": SYSTEM_PROMPT,
+            "temperature": 0,
+            "max_output_tokens": 4096,
+            "response_mime_type": "application/json",
+            "response_schema": get_gemini_schema(get_invoice_schema()),
         },
-
-        temperature=0,
-
-        max_completion_tokens=4096,
-
-        reasoning_effort="medium"
     )
 
-    content = completion.choices[0].message.content
+    content = response.text
 
     if not content:
-        raise ValueError("Groq returned empty response")
+        raise ValueError("Gemini returned an empty response")
 
     try:
         data = json.loads(content)
 
     except json.JSONDecodeError as e:
         raise ValueError(
-            f"Invalid JSON returned by Groq: {e}"
+            f"Invalid JSON returned by Gemini: {e}"
         )
 
     # Pydantic validation

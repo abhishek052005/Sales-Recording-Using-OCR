@@ -1,6 +1,7 @@
 # Local environment configuration file (Crucial)
 .env
 reg.txt
+saved_invoices.json
 # Virtual environment folders
 venv/
 
@@ -8,3 +9,5 @@ venv/
 # Python caches
 __pycache__/
 *.pyc
+
+
