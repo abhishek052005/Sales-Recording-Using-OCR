@@ -6,7 +6,19 @@ import os
 def deskew(image):
     """Automatically straighten the image"""
 
-    coords = np.column_stack(np.where(image < 255))
+    sample_scale = min(1.0, 1000 / max(image.shape[:2]))
+    if sample_scale < 1.0:
+        sample = cv2.resize(
+            image,
+            None,
+            fx=sample_scale,
+            fy=sample_scale,
+            interpolation=cv2.INTER_AREA
+        )
+    else:
+        sample = image
+
+    coords = np.column_stack(np.where(sample < 255))
 
     if len(coords) == 0:
         return image
@@ -42,13 +54,17 @@ def preprocess_image(input_path, output_path):
     # -----------------------
     # Resize
     # -----------------------
+    scale = min(2.0, 2400 / max(image.shape[:2]))
     image = cv2.resize(
         image,
         None,
-        fx=2,
-        fy=2,
-        interpolation=cv2.INTER_CUBIC
+        fx=scale,
+        fy=scale,
+        interpolation=cv2.INTER_CUBIC if scale >= 1 else cv2.INTER_AREA
     )
+
+    original_path = os.path.splitext(output_path)[0] + "_original.png"
+    cv2.imwrite(original_path, image)
 
     # -----------------------
     # Gray
@@ -137,5 +153,5 @@ def preprocess_image(input_path, output_path):
     return {
         "gray": gray_path,
         "threshold": threshold_path,
-        "original": input_path
+        "original": original_path
     }
