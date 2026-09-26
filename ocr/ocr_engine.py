@@ -1,5 +1,3 @@
-import os
-import cv2
 import numpy as np
 from paddleocr import PaddleOCR
 
@@ -61,29 +59,8 @@ def parse_receipt_boxes(ocr_results, y_tolerance=12, min_score=0.55):
     return "\n".join(lines)
 
 
-def extract_best_text(images: dict) -> str:
-    """Run OCR once on the preferred variant, with fallbacks when needed."""
-    preferred_images = [
-        images.get("threshold"),
-        images.get("gray"),
-        images.get("original"),
-    ]
-
+def extract_best_text(image_path: str) -> str:
+    """Run OCR directly on an image without preprocessing variants."""
     ocr_engine = get_ocr()
-
-    for path in preferred_images:
-        if not path:
-            continue
-        if not os.path.exists(path):
-            continue
-
-        raw_result = ocr_engine.ocr(path, cls=True)
-
-        if not raw_result or not raw_result[0]:
-            continue
-
-        text = parse_receipt_boxes(raw_result)
-        if text.strip():
-            return text
-
-    return ""
+    raw_result = ocr_engine.ocr(image_path, cls=True)
+    return parse_receipt_boxes(raw_result)
