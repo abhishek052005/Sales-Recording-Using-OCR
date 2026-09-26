@@ -1,13 +1,22 @@
-# Local environment configuration file (Crucial)
+# Local environment configuration
 .env
 reg.txt
 saved_invoices.json
-# Virtual environment folders
-venv/
+project_structure.txt
 
+# Virtual environment
+venv/
 
 # Python caches
 __pycache__/
 *.pyc
 
+# Local OCR temporary application folders (Crucial)
+uploads/*
+processed/*
+ocr_output/*
 
+# Keep the folders but ignore the files inside them
+!uploads/.gitkeep
+!processed/.gitkeep
+!ocr_output/.gitkeep
