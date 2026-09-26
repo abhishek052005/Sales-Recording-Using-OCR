@@ -208,6 +208,9 @@ async def save_review(
         "filename": filename
     }
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 @app.get("/invoices")
 def get_invoices():
