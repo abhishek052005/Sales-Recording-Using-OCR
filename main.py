@@ -217,14 +217,21 @@ def get_invoices():
 # ==========================================
 # RUN SERVER
 # ==========================================
+# ==========================================
+# RUN SERVER
+# ==========================================
 
 if __name__ == "__main__":
+    # Render automatically injects the PORT variable. Fallback to 8000 locally.
+    port = int(os.environ.get("PORT", 8000))
+    
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True
+        host="0.0.0.0",  
+        port=port,
+        reload=False     
     )
+
 
 
 
