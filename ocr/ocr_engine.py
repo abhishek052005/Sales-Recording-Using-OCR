@@ -246,16 +246,23 @@ def parse_receipt_boxes(
 
         return ""
 
-    if not ocr_results[0]:
-        print("OCR result contains no boxes.")
-
-        return ""
-
     parsed_items = []
 
     try:
 
-        for item in ocr_results[0]:
+        first_result = ocr_results[0]
+        if isinstance(first_result, dict):
+            boxes = zip(
+                first_result.get("rec_polys", first_result.get("dt_polys", [])),
+                zip(
+                    first_result.get("rec_texts", []),
+                    first_result.get("rec_scores", []),
+                ),
+            )
+        else:
+            boxes = first_result or []
+
+        for item in boxes:
 
             if not item:
                 continue
@@ -456,14 +463,11 @@ def extract_best_text(images: dict) -> str:
                 "Starting PaddleOCR..."
             )
 
-            # ------------------------------------------------
-            # PaddleOCR 2.x
-            # ------------------------------------------------
-
-            raw_result = ocr_engine.ocr(
-                ocr_path,
-                cls=False
-            )
+            predict = getattr(ocr_engine, "predict", None)
+            if callable(predict):
+                raw_result = list(predict(ocr_path))
+            else:
+                raw_result = ocr_engine.ocr(ocr_path, cls=False)
 
             print(
                 "PaddleOCR recognition finished."
