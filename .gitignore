@@ -6,6 +6,8 @@ project_structure.txt
 
 # Virtual environment
 venv/
+.venv
+.venv/
 
 # Python caches
 __pycache__/

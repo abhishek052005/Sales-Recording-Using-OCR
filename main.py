@@ -131,17 +131,17 @@ def process_invoice(file: UploadFile):
         "duplicate_invoice": duplicate_invoice,
     }
 
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    contents = await file.read()
-
-    return {
-        "filename": file.filename,
-        "size": len(contents),
-        "message": "Upload works"
-    }
 # @app.post("/upload")
-# async def upload_invoice(files: list[UploadFile] = File(...)):
+# async def upload_file(file: UploadFile = File(...)):
+#     contents = await file.read()
+
+#     return {
+#         "filename": file.filename,
+#         "size": len(contents),
+#         "message": "Upload works"
+#     }
+@app.post("/upload")
+async def upload_invoice(files: list[UploadFile] = File(...)):
     async def stream_results():
         for file in files:
             try:

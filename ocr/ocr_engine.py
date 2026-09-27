@@ -11,7 +11,7 @@ ocr = None
 def get_ocr():
     global ocr
     if ocr is None:
-        ocr = PaddleOCR(lang="en", use_angle_cls=True)
+        ocr = PaddleOCR(lang="en", enable_mkldnn=False)
     return ocr
 
 
@@ -22,7 +22,18 @@ def parse_receipt_boxes(ocr_results, y_tolerance=12, min_score=0.55):
     if not ocr_results or not ocr_results[0]:
         return ""
 
-    boxes = ocr_results[0]
+    first_result = ocr_results[0]
+    if isinstance(first_result, dict):
+        boxes = zip(
+            first_result.get("rec_polys", []),
+            zip(
+                first_result.get("rec_texts", []),
+                first_result.get("rec_scores", []),
+            ),
+        )
+    else:
+        boxes = first_result
+
     parsed_items = []
 
     for box, (text, score) in boxes:
@@ -77,7 +88,13 @@ def extract_best_text(images: dict) -> str:
         if not os.path.exists(path):
             continue
 
-        raw_result = ocr_engine.ocr(path, cls=True)
+        if hasattr(ocr_engine, "predict"):
+            raw_result = ocr_engine.predict(path)
+        else:
+            try:
+                raw_result = ocr_engine.ocr(path, cls=True)
+            except TypeError:
+                raw_result = ocr_engine.ocr(path)
 
         if not raw_result or not raw_result[0]:
             continue
