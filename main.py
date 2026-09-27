@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -144,8 +145,26 @@ def process_invoice(file: UploadFile):
 async def upload_invoice(files: list[UploadFile] = File(...)):
     async def stream_results():
         for file in files:
+            task = asyncio.create_task(asyncio.to_thread(process_invoice, file))
+            yield json.dumps({
+                "type": "progress",
+                "filename": file.filename or "unknown file",
+            }) + "\n"
+
             try:
-                result = process_invoice(file)
+                while not task.done():
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.shield(task),
+                            timeout=15,
+                        )
+                    except asyncio.TimeoutError:
+                        yield json.dumps({
+                            "type": "progress",
+                            "filename": file.filename or "unknown file",
+                        }) + "\n"
+
+                result = await task
                 yield json.dumps({"type": "invoice", "result": result}) + "\n"
             except Exception as error:
                 yield json.dumps({
