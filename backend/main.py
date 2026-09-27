@@ -23,26 +23,18 @@ app = FastAPI(title="Invoice OCR Backend")
 # ==========================================
 
 
-frontend_origins = [
+configured_frontend_origins = [
     origin.strip().rstrip("/")
     for origin in os.getenv(
         "FRONTEND_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:5500",
+        "https://sales-recording-using-ocr.vercel.app,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8001,http://127.0.0.1:8001",
     ).split(",")
-    if origin.strip()
+    if origin.strip() and origin.strip().lower() != "null"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://sales-recording-using-ocr.vercel.app",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:8001",
-        "http://127.0.0.1:8001",
-    ],
+    allow_origins=configured_frontend_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

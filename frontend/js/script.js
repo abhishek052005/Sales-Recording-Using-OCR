@@ -40,6 +40,22 @@ const setMessage = (type, text) => {
   messageBox.textContent = text;
 };
 
+const formatErrorMessage = (error) => {
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return `Cannot reach ${API_BASE_URL || 'the configured API'} from ${window.location.origin}. Check that the Render service is live and FRONTEND_ORIGINS includes this page origin.`;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    if (typeof error.detail === 'string') return error.detail;
+    if (typeof error.message === 'string') return error.message;
+    try {
+      return JSON.stringify(error);
+    } catch {}
+  }
+  return 'An unexpected error occurred.';
+};
+
 const formatMoney = (value) => {
   if (value === null || value === undefined || value === '') {
     return '—';
@@ -246,7 +262,7 @@ const loadInvoiceEntries = async () => {
   } catch (error) {
     invoiceTableBody.innerHTML = `
       <tr>
-        <td colspan="7" class="empty-state">Unable to load saved invoices.</td>
+        <td colspan="7" class="empty-state">Unable to load saved invoices: ${escapeHtml(formatErrorMessage(error))}</td>
       </tr>
     `;
   }
@@ -439,7 +455,7 @@ reviewForm.addEventListener('submit', async (event) => {
     }
 
     if (!response.ok) {
-      throw new Error(result.error || result.detail || 'Failed to save invoice.');
+      throw new Error(formatErrorMessage(result.error || result.detail || 'Failed to save invoice.'));
     }
 
     setMessage('success', `Invoice saved successfully: ${result.filename}`);
@@ -447,7 +463,7 @@ reviewForm.addEventListener('submit', async (event) => {
     await loadInvoiceEntries();
     showNextInvoice();
   } catch (error) {
-    setMessage('error', error.message || 'Unable to save the reviewed invoice.');
+    setMessage('error', formatErrorMessage(error));
     setSystemStatus('Error');
   } finally {
     confirmReviewBtn.disabled = false;
@@ -486,7 +502,7 @@ uploadForm.addEventListener('submit', async (event) => {
       let errorDetail = responseBody.trim();
       try {
         const result = JSON.parse(responseBody);
-        errorDetail = result.error || result.detail || errorDetail;
+        errorDetail = formatErrorMessage(result.error || result.detail || errorDetail);
       } catch {}
 
       if (response.ok) {
@@ -524,7 +540,7 @@ uploadForm.addEventListener('submit', async (event) => {
       if (event.type === 'invoice') handleInvoiceResult(event.result);
     }
   } catch (error) {
-    setMessage('error', error.message || 'An unexpected error occurred.');
+    setMessage('error', formatErrorMessage(error));
     setSystemStatus('Error');
   } finally {
     processingBatch = false;
