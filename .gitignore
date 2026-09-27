@@ -13,12 +13,18 @@ venv/
 __pycache__/
 *.pyc
 
-# Local OCR temporary application folders (Crucial)
+# Local OCR temporary application folders
 uploads/*
 processed/*
 ocr_output/*
+backend/uploads/*
+backend/processed/*
+backend/ocr_output/*
 
 # Keep the folders but ignore the files inside them
 !uploads/.gitkeep
 !processed/.gitkeep
 !ocr_output/.gitkeep
+!backend/uploads/.gitkeep
+!backend/processed/.gitkeep
+!backend/ocr_output/.gitkeep

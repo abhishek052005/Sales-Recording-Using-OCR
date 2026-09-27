@@ -1,5 +1,5 @@
 // Base API configuration
-const API_BASE_URL = '';
+const API_BASE_URL = (window.API_BASE_URL || '').replace(/\/+$/, '');
 
 // DOM Elements
 const uploadForm = document.getElementById('uploadForm');
@@ -482,13 +482,20 @@ uploadForm.addEventListener('submit', async (event) => {
     });
 
     if (!response.ok || !response.body) {
-      let result = {};
+      const responseBody = await response.text();
+      let errorDetail = responseBody.trim();
       try {
-        result = await response.json();
-      } catch (e) {
-        throw new Error(`Server error (${response.status}: ${response.statusText})`);
+        const result = JSON.parse(responseBody);
+        errorDetail = result.error || result.detail || errorDetail;
+      } catch {}
+
+      if (response.ok) {
+        throw new Error('The server did not return an upload response body.');
       }
-      throw new Error(result.error || result.detail || 'Upload failed.');
+
+      const statusText = response.statusText ? ` ${response.statusText}` : '';
+      const detail = errorDetail ? `: ${errorDetail}` : '';
+      throw new Error(`Server error (${response.status}${statusText})${detail}`);
     }
 
     const reader = response.body.getReader();
@@ -506,6 +513,8 @@ uploadForm.addEventListener('submit', async (event) => {
         } else if (event.type === 'error') {
           setMessage('error', `${event.filename}: ${event.error}`);
           setSystemStatus('Error');
+        } else if (event.type === 'progress') {
+          setSystemStatus(`Processing ${event.filename}...`);
         }
       });
       if (done) break;

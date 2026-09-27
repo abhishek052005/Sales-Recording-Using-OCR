@@ -1,10 +1,11 @@
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from threading import Lock
 
 
-STORE_PATH = "saved_invoices.json"
+STORE_PATH = Path(__file__).resolve().parent / "saved_invoices.json"
 _store_lock = Lock()
 
 
